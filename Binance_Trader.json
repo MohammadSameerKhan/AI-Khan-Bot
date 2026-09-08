@@ -1,0 +1,220 @@
+{
+  "name": "Binance Trader",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trade-signal",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "3e7daaa7-be68-4853-8e48-21642562349a",
+      "name": "Webhook",
+      "webhookId": "5126e626-b54a-4a2c-9a1f-f84dbbabb5bc"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "282e5a94-12b3-4162-bcd0-973d4936d2ba",
+              "leftValue": "={{ $json.body.action }}",
+              "rightValue": "buy",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "5d738772-0701-4484-ba56-088897ae82d7",
+              "leftValue": "={{ $json.body.action }}",
+              "rightValue": "sell",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        208,
+        0
+      ],
+      "id": "1fa01688-6173-4075-ad92-e989de82a1a1",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "const { createHmac } = require('crypto');\n\nconst apiSecret = $env.BINANCE_API_SECRET;\nconst action = $input.first().json.body.action.toUpperCase();\nconst symbol = $input.first().json.body.symbol;\nconst quantity = $input.first().json.body.quantity;\nconst timestamp = Date.now();\nconst queryString = `symbol=${symbol}&side=${action}&type=MARKET&quantity=${quantity}&timestamp=${timestamp}`;\nconst signature = createHmac('sha256', apiSecret).update(queryString).digest('hex');\n\nreturn [{ json: { symbol, side: action, type: 'MARKET', quantity, timestamp, signature, queryString } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        -96
+      ],
+      "id": "c92d36b3-abed-4270-aaf6-05d9fcce0376",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.binance.us/api/v3/order?{{ $json.queryString }}&signature={{ $json.signature }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/x-www-form-urlencoded"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        624,
+        -96
+      ],
+      "id": "9a8dca51-87cb-4e3a-ab7e-6ee90edb8cd0",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "XRYrCAUL8jsu3Rju",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "8609110392",
+        "text": "=✅ Trade Executed!\nAction: {{ $json.side }}\nSymbol: {{ $json.symbol }}\nQuantity: {{ $json.quantity }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        832,
+        -96
+      ],
+      "id": "930f58d1-6fd9-4026-845f-51082ddf023e",
+      "name": "Send a text message",
+      "webhookId": "cfee0567-3f9a-40e0-a8a9-0887ac874c04",
+      "credentials": {
+        "telegramApi": {
+          "id": "01KPGUipgznjrSSr",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "8609110392",
+        "text": "⚠️ Invalid signal received and blocked!",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        416,
+        96
+      ],
+      "id": "eb18d06a-cd27-4473-8971-ea9165778834",
+      "name": "Send a text message1",
+      "webhookId": "1ff87062-7157-4577-b950-b069d5124c73",
+      "credentials": {
+        "telegramApi": {
+          "id": "01KPGUipgznjrSSr",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a text message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "045d2c34-7e5f-4b98-9704-da991c0367b5",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c5903ce3e5aaab3b56fd4ad184d6fbaa7921a2ff6dcb01eecaeea21ad4da6cc2"
+  },
+  "id": "o7Es7lBpZFoAYRRs",
+  "tags": []
+}
